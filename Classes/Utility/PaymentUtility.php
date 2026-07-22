@@ -157,6 +157,7 @@ class PaymentUtility
 //                    'shipping[tracking_number]' => 'shipping.tracking_number',
 //                    'shipping[tracking_url]' => 'shipping.tracking_url',
                     'shopsystem[name]' => 'extcode/Cart',
+                    'payment_methods' = 'dankort,mobilepay',
                     // 'shopsystem[version]' => 'shopsystem.version',
                     // 'variables' => 'variables',
                     // 'text_on_statement' => 'text_on_statement',
@@ -176,7 +177,8 @@ class PaymentUtility
                     $link = $client->request->put($endpoint, [
                         'amount' => $this->orderItem->getTotalGross()*100,
                         'continueurl' => $this->getUrl('success', $cart->getSHash()),
-                        'cancel_url' => $this->getUrl('cancel', $cart->getFHash())
+                        'cancel_url' => $this->getUrl('cancel', $cart->getFHash()),
+                        'payment_methods' = 'dankort,mobilepay',
 //                        'callback_url' => $this->getUrl('confirm', $cart->getSHash())
                         ]);
             
