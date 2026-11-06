@@ -20,8 +20,8 @@ $EM_CONF[$_EXTKEY] = [
     'version' => '0.0.1',
     'constraints' => [
         'depends' => [
-            'typo3' => '9.5.0-10.4.99',
-            'cart' => '6.3.0-8.6.99',
+            'typo3' => '9.5.0-14.4.99',
+            'cart' => '6.3.0-11.5.99',
         ],
         'conflicts' => [],
         'suggests' => [],
