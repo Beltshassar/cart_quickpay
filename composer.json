@@ -28,9 +28,10 @@
         "issues": "https://github.com/Beltshassar/cart_quickpay/issues"
     },
     "require": {
-        "typo3/cms-core": "^9.5 || ^10.4 || ^11 || ^12 || ^13 || ^14",
-        "typo3/cms-extbase": "^9.5 || ^10.4 || ^11 || ^12 || ^13 || ^14",
-        "extcode/cart": "^6.3 || ^7.0 || ^8.0 || ^9 || ^10 || ^11",
+        "php": "^8.2",
+        "typo3/cms-core": "^13.4",
+        "typo3/cms-extbase": "^13.4",
+        "extcode/cart": "^11",
         "quickpay/quickpay-php-client": "^1.0 || ^2"
     },
     "require-dev": {

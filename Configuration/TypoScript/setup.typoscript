@@ -10,40 +10,24 @@ cartQuickpay {
         no_cache = 1
     }
 
-    10 < tt_content.list.20.cartquickpay_cart
-    10.features.requireCHashArgumentForActionArguments = 0
+    10 = EXTBASEPLUGIN
+    10 {
+        extensionName = CartQuickpay
+        pluginName = Cart
+    }
 }
 
 plugin.tx_cartquickpay {
 
     redirectTypeNum = {$plugin.tx_cartquickpay.redirectTypeNum}
 
-    finishers {
-        order {
-            success {
-                327 {
-                    class = IMHLab\CartProductsUsergroup\Domain\Finisher\Order\UsergroupProductFinisher
-                }
-                350 {
-                    class = Extcode\CartPdf\Domain\Finisher\Order\DocumentFinisher
-                }
-                400 {
-                    class = Extcode\Cart\Domain\Finisher\Order\EmailFinisher
-                }
-                500 {
-                    class = Extcode\Cart\Domain\Finisher\Order\ClearCartFinisher
-                }
-            }
-        }
-    }
+    # The former "finishers.order.success" configuration is gone in EXT:cart 11.
+    # After a successful payment the PaymentController dispatches
+    # \Extcode\Cart\Event\Order\FinishEvent - all listeners of this event
+    # (mails and clear cart from EXT:cart, usergroup assignment from
+    # EXT:cart_products_usergroup, ...) are executed.
 
     settings {
         api_user = {$plugin.tx_cartquickpay.settings.api_user}
     }
 }
-
-
-
-
-
-

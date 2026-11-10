@@ -1,0 +1,14 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: false
+
+  Imhlab\CartQuickpay\:
+    resource: '../Classes/*'
+
+  Imhlab\CartQuickpay\EventListener\Order\Payment\ProviderRedirect:
+    tags:
+      - name: event.listener
+        identifier: 'cart-quickpay--order--payment--provider-redirect'
+        event: Extcode\Cart\Event\Order\PaymentEvent

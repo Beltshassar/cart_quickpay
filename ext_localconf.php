@@ -1,29 +1,27 @@
 <?php
+
 defined('TYPO3') or die('Access denied.');
+
+use Imhlab\CartQuickpay\Controller\Order\PaymentController;
+use TYPO3\CMS\Extbase\Utility\ExtensionUtility;
 
 // configure plugins
 
-\TYPO3\CMS\Extbase\Utility\ExtensionUtility::configurePlugin(
-    'Imhlab.cart_quickpay',
+ExtensionUtility::configurePlugin(
+    'CartQuickpay',
     'Cart',
     [
-        'Order\Payment' => 'confirm, success, cancel',
+        PaymentController::class => 'confirm, success, cancel',
     ],
     // non-cacheable actions
     [
-        'Order\Payment' => 'confirm, success, cancel',
+        PaymentController::class => 'confirm, success, cancel',
     ]
 );
 
-// configure signal slots
-
-$dispatcher = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Extbase\SignalSlot\Dispatcher::class);
-$dispatcher->connect(
-    \Extcode\Cart\Utility\PaymentUtility::class,
-    'handlePayment',
-    \Imhlab\CartQuickpay\Utility\PaymentUtility::class,
-    'handlePayment'
-);
+// The former signal slot (Extcode\Cart\Utility\PaymentUtility::handlePayment) is replaced by the
+// PSR-14 event listener Imhlab\CartQuickpay\EventListener\Order\Payment\ProviderRedirect
+// registered in Configuration/Services.yaml
 
 // exclude parameters from cHash
 

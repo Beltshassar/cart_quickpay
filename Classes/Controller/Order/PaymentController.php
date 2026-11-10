@@ -1,287 +1,155 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Imhlab\CartQuickpay\Controller\Order;
 
+use Extcode\Cart\Domain\Model\Cart;
 use Extcode\Cart\Domain\Repository\CartRepository;
 use Extcode\Cart\Domain\Repository\Order\PaymentRepository;
-use Extcode\Cart\Service\SessionHandler;
+use Extcode\Cart\Event\Order\FinishEvent;
+use Psr\Http\Message\ResponseInterface;
+use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface;
+use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Extbase\Persistence\Generic\PersistenceManager;
+use TYPO3\CMS\Extbase\Persistence\Generic\Typo3QuerySettings;
 use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
 
-class PaymentController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionController
+class PaymentController extends ActionController
 {
-    /**
-     * @var PersistenceManager
-     */
-    protected $persistenceManager;
+    protected ?Cart $cart = null;
 
-    /**
-     * @var SessionHandler
-     */
-    protected $sessionHandler;
+    protected array $cartPluginSettings = [];
 
-    /**
-     * @var CartRepository
-     */
-    protected $cartRepository;
+    public function __construct(
+        protected readonly PersistenceManager $persistenceManager,
+        protected readonly CartRepository $cartRepository,
+        protected readonly PaymentRepository $paymentRepository,
+    ) {}
 
-    /**
-     * @var PaymentRepository
-     */
-    protected $paymentRepository;
-
-    /**
-     * @var \Extcode\Cart\Domain\Model\Cart
-     */
-    protected $cart = null;
-
-    /**
-     * @var array
-     */
-    protected $pluginSettings = [];
-
-    /**
-     * @var array
-     */
-    protected $cartPluginSettings = [];
-
-    /**
-     * @param PersistenceManager $persistenceManager
-     */
-    public function injectPersistenceManager(PersistenceManager $persistenceManager)
+    protected function initializeAction(): void
     {
-        $this->persistenceManager = $persistenceManager;
-    }
-
-    /**
-     * @param SessionHandler $sessionHandler
-     */
-    public function injectSessionHandler(SessionHandler $sessionHandler)
-    {
-        $this->sessionHandler = $sessionHandler;
-    }
-
-    /**
-     * @param CartRepository $cartRepository
-     */
-    public function injectCartRepository(CartRepository $cartRepository)
-    {
-        $this->cartRepository = $cartRepository;
-    }
-
-    /**
-     * @param PaymentRepository $paymentRepository
-     */
-    public function injectPaymentRepository(PaymentRepository $paymentRepository)
-    {
-        $this->paymentRepository = $paymentRepository;
-    }
-
-    protected function initializeAction()
-    {
-        $this->pluginSettings = $this->configurationManager->getConfiguration(
-            \TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface::CONFIGURATION_TYPE_FRAMEWORK,
-            'CartQuickpay'
-        );
-
         $this->cartPluginSettings = $this->configurationManager->getConfiguration(
-            \TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface::CONFIGURATION_TYPE_FRAMEWORK,
+            ConfigurationManagerInterface::CONFIGURATION_TYPE_FRAMEWORK,
             'Cart'
         );
     }
 
-    public function confirmAction()
+    public function confirmAction(): ResponseInterface
     {
-        if ($this->request->hasArgument('hash') && !empty($this->request->getArgument('hash'))) {
-            $hash = $this->request->getArgument('hash');
-
-            $querySettings = $this->objectManager->get(
-                \TYPO3\CMS\Extbase\Persistence\Generic\Typo3QuerySettings::class
-            );
-            $querySettings->setStoragePageIds([$this->cartPluginSettings['settings']['order']['pid']]);
-            $this->cartRepository->setDefaultQuerySettings($querySettings);
-
-            $this->cart = $this->cartRepository->findOneBySHash($hash);
-
-            if ($this->cart) {
-                $orderItem = $this->cart->getOrderItem();
-                $payment = $orderItem->getPayment();
-
-                if ($payment->getStatus() !== 'paid') {
-                    $payment->setStatus('paid');
-
-                    $this->paymentRepository->update($payment);
-                    $this->persistenceManager->persistAll();
-
-                    $this->invokeFinishers($orderItem, 'success');
-                }
-                $this->redirect('show', 'Cart\Order', 'Cart', ['orderItem' => $orderItem]);
-            } else {
-                $this->addFlashMessage(
-                    LocalizationUtility::translate(
-                        'tx_cartquickpay.controller.order.payment.action.confirm.error_occured',
-                        $this->extensionName
-                    ),
-                    '',
-                    \TYPO3\CMS\Core\Messaging\AbstractMessage::ERROR
-                );
-            }
-        } else {
-            $this->addFlashMessage(
-                LocalizationUtility::translate(
-                    'tx_cartquickpay.controller.order.payment.action.confirm.access_denied',
-                    $this->extensionName
-                ),
-                '',
-                \TYPO3\CMS\Core\Messaging\AbstractMessage::ERROR
-            );
-        }
+        return $this->handleSuccess('confirm');
     }
 
-    public function successAction()
+    public function successAction(): ResponseInterface
     {
-        if ($this->request->hasArgument('hash') && !empty($this->request->getArgument('hash'))) {
-            $hash = $this->request->getArgument('hash');
-
-            $querySettings = $this->objectManager->get(
-                \TYPO3\CMS\Extbase\Persistence\Generic\Typo3QuerySettings::class
-            );
-            $querySettings->setStoragePageIds([$this->cartPluginSettings['settings']['order']['pid']]);
-            $this->cartRepository->setDefaultQuerySettings($querySettings);
-
-            $this->cart = $this->cartRepository->findOneBySHash($hash);
-
-            if ($this->cart) {
-                $orderItem = $this->cart->getOrderItem();
-                $payment = $orderItem->getPayment();
-
-                if ($payment->getStatus() !== 'paid') {
-                    $payment->setStatus('paid');
-
-                    $this->paymentRepository->update($payment);
-                    $this->persistenceManager->persistAll();
-
-                    $this->invokeFinishers($orderItem, 'success');
-                }
-                $this->redirect('show', 'Cart\Order', 'Cart', ['orderItem' => $orderItem]);
-            } else {
-                $this->addFlashMessage(
-                    LocalizationUtility::translate(
-                        'tx_cartquickpay.controller.order.payment.action.success.error_occured',
-                        $this->extensionName
-                    ),
-                    '',
-                    \TYPO3\CMS\Core\Messaging\AbstractMessage::ERROR
-                );
-            }
-        } else {
-            $this->addFlashMessage(
-                LocalizationUtility::translate(
-                    'tx_cartquickpay.controller.order.payment.action.success.access_denied',
-                    $this->extensionName
-                ),
-                '',
-                \TYPO3\CMS\Core\Messaging\AbstractMessage::ERROR
-            );
-        }
+        return $this->handleSuccess('success');
     }
 
-    public function cancelAction()
+    public function cancelAction(): ResponseInterface
     {
-        if ($this->request->hasArgument('hash') && !empty($this->request->getArgument('hash'))) {
-            $hash = $this->request->getArgument('hash');
-
-            $querySettings = $this->objectManager->get(
-                \TYPO3\CMS\Extbase\Persistence\Generic\Typo3QuerySettings::class
-            );
-            $querySettings->setStoragePageIds([$this->cartPluginSettings['settings']['order']['pid']]);
-            $this->cartRepository->setDefaultQuerySettings($querySettings);
-
-            $this->cart = $this->cartRepository->findOneByFHash($hash);
-
-            if ($this->cart) {
-                $orderItem = $this->cart->getOrderItem();
-                $payment = $orderItem->getPayment();
-
-                $payment->setStatus('canceled');
-
-                $this->paymentRepository->update($payment);
-                $this->persistenceManager->persistAll();
-
-                $this->addFlashMessage(
-                    LocalizationUtility::translate(
-                        'tx_cartquickpay.controller.order.payment.action.cancel.successfully_canceled',
-                        $this->extensionName
-                    ),
-                    '',
-                    \TYPO3\CMS\Core\Messaging\AbstractMessage::OK
-                );
-
-                $this->invokeFinishers($orderItem, 'cancel');
-
-                $this->redirect('show', 'Cart\Cart', 'Cart');
-            } else {
-                $this->addFlashMessage(
-                    LocalizationUtility::translate(
-                        'tx_cartquickpay.controller.order.payment.action.cancel.error_occured',
-                        $this->extensionName
-                    ),
-                    '',
-                    \TYPO3\CMS\Core\Messaging\AbstractMessage::ERROR
-                );
-            }
-        } else {
-            $this->addFlashMessage(
-                LocalizationUtility::translate(
-                    'tx_cartquickpay.controller.order.payment.action.cancel.access_denied',
-                    $this->extensionName
-                ),
-                '',
-                \TYPO3\CMS\Core\Messaging\AbstractMessage::ERROR
-            );
+        $hash = $this->getHashArgument();
+        if ($hash === '') {
+            $this->addErrorMessage('cancel', 'access_denied');
+            return $this->htmlResponse();
         }
-    }
 
-    /**
-     * Executes all finishers of this form
-     *
-     * @param \Extcode\Cart\Domain\Model\Order\Item $orderItem
-     * @param string $returnStatus
-     */
-    protected function invokeFinishers(\Extcode\Cart\Domain\Model\Order\Item $orderItem, string $returnStatus)
-    {
-        $cart = $this->sessionHandler->restore($this->cartPluginSettings['settings']['cart']['pid']);
+        $this->cart = $this->findCartByHash('fHash', $hash);
+        if ($this->cart === null) {
+            $this->addErrorMessage('cancel', 'error_occured');
+            return $this->htmlResponse();
+        }
 
-        $finisherContext = $this->objectManager->get(
-            \Extcode\Cart\Domain\Finisher\FinisherContext::class,
-            $this->cartPluginSettings,
-            $cart,
-            $orderItem,
-            $this->getControllerContext()
+        $orderItem = $this->cart->getOrderItem();
+        $payment = $orderItem->getPayment();
+
+        $payment->setStatus('canceled');
+
+        $this->paymentRepository->update($payment);
+        $this->persistenceManager->persistAll();
+
+        $this->addFlashMessage(
+            $this->translate('tx_cartquickpay.controller.order.payment.action.cancel.successfully_canceled'),
+            '',
+            ContextualFeedbackSeverity::OK
         );
 
-        if (is_array($this->pluginSettings['finishers']) &&
-            is_array($this->pluginSettings['finishers']['order']) &&
-            is_array($this->pluginSettings['finishers']['order'][$returnStatus])
-        ) {
-            ksort($this->pluginSettings['finishers']['order'][$returnStatus]);
-            foreach ($this->pluginSettings['finishers']['order'][$returnStatus] as $finisherConfig) {
-                $finisherClass = $finisherConfig['class'];
+        return $this->redirect('show', 'Cart\Cart', 'Cart', null, $this->getCartPid());
+    }
 
-                if (class_exists($finisherClass)) {
-                    $finisher = $this->objectManager->get($finisherClass);
-                    $finisher->execute($finisherContext);
-                    if ($finisherContext->isCancelled()) {
-                        break;
-                    }
-                } else {
-                    $logManager = $this->objectManager->get(
-                        \TYPO3\CMS\Core\Log\LogManager::class
-                    );
-                    $logger = $logManager->getLogger(__CLASS__);
-                    $logger->error('Can\'t find Finisher class \'' . $finisherClass . '\'.', []);
-                }
+    protected function handleSuccess(string $action): ResponseInterface
+    {
+        $hash = $this->getHashArgument();
+        if ($hash === '') {
+            $this->addErrorMessage($action, 'access_denied');
+            return $this->htmlResponse();
+        }
+
+        $this->cart = $this->findCartByHash('sHash', $hash);
+        if ($this->cart === null) {
+            $this->addErrorMessage($action, 'error_occured');
+            return $this->htmlResponse();
+        }
+
+        $orderItem = $this->cart->getOrderItem();
+        $payment = $orderItem->getPayment();
+
+        if ($payment->getStatus() !== 'paid') {
+            $payment->setStatus('paid');
+
+            $this->paymentRepository->update($payment);
+            $this->persistenceManager->persistAll();
+
+            // Replaces the former "finishers.order.success" of this extension:
+            // EXT:cart sends mails, clears the cart etc. in listeners of the FinishEvent,
+            // EXT:cart_products_usergroup assigns user groups in a listener of the same event.
+            $cart = $this->cart->getCart();
+            if ($cart !== null) {
+                $finishEvent = new FinishEvent($cart, $orderItem, $this->cartPluginSettings);
+                $this->eventDispatcher->dispatch($finishEvent);
             }
         }
+
+        return $this->redirect('show', 'Cart\Order', 'Cart', ['orderItem' => $orderItem], $this->getCartPid());
+    }
+
+    protected function findCartByHash(string $property, string $hash): ?Cart
+    {
+        $querySettings = GeneralUtility::makeInstance(Typo3QuerySettings::class);
+        $querySettings->setStoragePageIds([(int)($this->cartPluginSettings['settings']['order']['pid'] ?? 0)]);
+        $this->cartRepository->setDefaultQuerySettings($querySettings);
+
+        $cart = $this->cartRepository->findOneBy([$property => $hash]);
+
+        return $cart instanceof Cart ? $cart : null;
+    }
+
+    protected function getHashArgument(): string
+    {
+        if (!$this->request->hasArgument('hash')) {
+            return '';
+        }
+        return (string)$this->request->getArgument('hash');
+    }
+
+    protected function getCartPid(): ?int
+    {
+        $pid = (int)($this->cartPluginSettings['settings']['cart']['pid'] ?? 0);
+        return $pid > 0 ? $pid : null;
+    }
+
+    protected function addErrorMessage(string $action, string $reason): void
+    {
+        $this->addFlashMessage(
+            $this->translate('tx_cartquickpay.controller.order.payment.action.' . $action . '.' . $reason),
+            '',
+            ContextualFeedbackSeverity::ERROR
+        );
+    }
+
+    protected function translate(string $key): string
+    {
+        return LocalizationUtility::translate($key, 'CartQuickpay') ?? $key;
     }
 }
